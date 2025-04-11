@@ -10,17 +10,25 @@ mod home_page;
 struct App {
     home_page: relm4::Controller<HomePage>,
     device_page: relm4::Controller<DevicePage>,
+    current_page: AppPage,
 }
 
 #[derive(Debug)]
-enum AppPage {
+enum SwitchAppPage {
     Home,
     Device(DeviceInfo),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum AppPage {
+    Home,
+    Device,
+}
+
 #[derive(Debug)]
 enum AppMsg {
-    SwitchPage(AppPage),
+    SwitchPage(SwitchAppPage),
+    Refresh,
 }
 
 #[relm4::component]
@@ -40,12 +48,13 @@ impl Component for App {
             home_page: HomePage::builder().launch(()).forward(
                 sender.input_sender(),
                 |HomePageOutput::SelectDevice(device_info)| {
-                    AppMsg::SwitchPage(AppPage::Device(device_info))
+                    AppMsg::SwitchPage(SwitchAppPage::Device(device_info))
                 },
             ),
             device_page: DevicePage::builder().launch(()).detach(),
+            current_page: AppPage::Home,
         };
-        sender.input(AppMsg::SwitchPage(AppPage::Home));
+        sender.input(AppMsg::SwitchPage(SwitchAppPage::Home));
 
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -59,16 +68,19 @@ impl Component for App {
         _root: &Self::Root,
     ) {
         match message {
-            AppMsg::SwitchPage(AppPage::Device(device_info)) => {
-                self.device_page
-                    .sender()
-                    .send(DevicePageMsg::Update(device_info))
-                    .unwrap();
+            AppMsg::SwitchPage(SwitchAppPage::Device(device_info)) => {
+                self.current_page = AppPage::Device;
+                self.device_page.emit(DevicePageMsg::Update(device_info));
                 widgets.root_stack.set_visible_child_name("device");
             }
-            AppMsg::SwitchPage(AppPage::Home) => {
+            AppMsg::SwitchPage(SwitchAppPage::Home) => {
+                self.current_page = AppPage::Home;
                 self.home_page.emit(HomePageMsg::UpdateDeviceList);
                 widgets.root_stack.set_visible_child_name("home");
+            }
+            AppMsg::Refresh => {
+                self.home_page.emit(HomePageMsg::UpdateDeviceList);
+                self.device_page.emit(DevicePageMsg::Refresh);
             }
         }
     }
@@ -76,12 +88,17 @@ impl Component for App {
     view! {
         adw::ApplicationWindow {
             set_title: Some("Ruzer"),
-            set_default_width: 500,
-            set_default_height: 500,
+            set_default_width: 1000,
+            set_default_height: 750,
 
             adw::ToolbarView {
-                #[name = "top_bar"]
-                add_top_bar = &adw::HeaderBar {},
+                add_top_bar = &adw::HeaderBar {
+                    #[name = "refresh_button"]
+                    pack_end = &gtk::Button {
+                        set_icon_name: "view-refresh-symbolic",
+                        connect_clicked => AppMsg::Refresh,
+                    },
+                },
 
                 #[wrap(Some)]
                 #[name = "root_stack"]

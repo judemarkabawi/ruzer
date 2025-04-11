@@ -19,6 +19,7 @@ pub struct DevicePage {
 #[derive(Debug)]
 pub enum DevicePageMsg {
     Update(nusb::DeviceInfo),
+    Refresh,
     SelectPollingRate(driver::common::PollingRate),
     SetDpi(Option<u16>),
     SetDpiStages(driver::common::DpiStages),
@@ -65,8 +66,13 @@ impl Component for DevicePage {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         match message {
-            DevicePageMsg::Update(device_info) => {
-                self.update(&sender, device_info);
+            DevicePageMsg::Update(usb_device_info) => {
+                self.update(&sender, usb_device_info);
+            }
+            DevicePageMsg::Refresh => {
+                if let Some(usb_device_info) = self.usb_device_info.clone() {
+                    self.update(&sender, usb_device_info);
+                }
             }
             DevicePageMsg::SelectPollingRate(polling_rate) => {
                 self.pending_changes.polling_rate = Some(polling_rate);
@@ -239,21 +245,18 @@ impl Component for DevicePage {
 }
 
 impl DevicePage {
-    fn update(&mut self, sender: &ComponentSender<DevicePage>, device_info: DeviceInfo) {
-        self.device_name = device_info
+    fn update(&mut self, sender: &ComponentSender<DevicePage>, usb_device_info: DeviceInfo) {
+        self.device_name = usb_device_info
             .product_string()
             .map(|device_name| device_name.to_owned());
-        self.usb_device_info = Some(device_info);
+        self.usb_device_info = Some(usb_device_info.clone());
 
         // Run batched device info command on device if exists
-        if let Some(device_info) = &self.usb_device_info {
-            let device_info = device_info.clone();
-            sender.oneshot_command(async move {
-                let device = driver::devices::RazerDevice::new(device_info);
-                let device_claimed = device.claim().unwrap();
-                DevicePageCommand::Update(device_claimed.get_batched().await)
-            });
-        }
+        sender.oneshot_command(async move {
+            let device = driver::devices::RazerDevice::new(usb_device_info);
+            let device_claimed = device.claim().unwrap();
+            DevicePageCommand::Update(device_claimed.get_batched().await)
+        });
     }
 
     fn apply_changes(&self, sender: &ComponentSender<DevicePage>) {

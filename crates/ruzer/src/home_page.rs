@@ -86,6 +86,8 @@ impl Component for HomePage {
         match message {
             HomePageMsg::UpdateDeviceList => {
                 let mut device_list = self.device_list.guard();
+                device_list.clear();
+
                 let devices_info = scan_devices();
                 for device in devices_info {
                     device_list.push_back(device);

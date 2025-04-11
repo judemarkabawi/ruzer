@@ -172,10 +172,7 @@ impl DpiStagesList {
 
     fn sort_dpi_stages_list(&mut self) {
         let mut dpi_stages_list = self.dpi_stages.guard();
-        let mut new_list: Vec<_> = dpi_stages_list
-            .iter()
-            .map(|listing| listing.clone())
-            .collect();
+        let mut new_list: Vec<_> = dpi_stages_list.iter().cloned().collect();
         new_list.sort_by(|a, b| a.dpi.x.cmp(&b.dpi.x));
 
         dpi_stages_list.clear();
