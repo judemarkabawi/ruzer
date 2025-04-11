@@ -62,7 +62,7 @@ impl Component for App {
             AppMsg::SwitchPage(AppPage::Device(device_info)) => {
                 self.device_page
                     .sender()
-                    .send(DevicePageMsg::PageUpdate(device_info))
+                    .send(DevicePageMsg::Update(device_info))
                     .unwrap();
                 widgets.root_stack.set_visible_child_name("device");
             }

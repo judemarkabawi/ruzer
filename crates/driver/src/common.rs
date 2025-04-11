@@ -17,6 +17,9 @@ pub(crate) const RAZER_USB_INTERFACE_NUMBER: u8 = 0x00;
 pub(crate) const RAZER_MOUSE_WAIT_TIME: Duration = Duration::from_millis(60);
 pub(crate) const RAZER_MOUSE_MAX_DPI_STAGES: u8 = 5;
 
+pub(crate) const RAZER_MOUSE_MIN_DPI: u16 = 100;
+pub(crate) const RAZER_MOUSE_MAX_DPI: u16 = 35000;
+
 // linux/hid.h
 pub(crate) const HID_REQ_GET_REPORT: u8 = 0x01;
 pub(crate) const HID_REQ_SET_REPORT: u8 = 0x09;
@@ -42,10 +45,10 @@ impl RazerMessage {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Dpi {
-    x: u16,
-    y: u16,
+    pub x: u16,
+    pub y: u16,
 }
 
 impl From<u16> for Dpi {
@@ -63,7 +66,7 @@ impl From<(u16, u16)> for Dpi {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DpiStages {
     pub(crate) active: u8,
     pub(crate) stages: Vec<(u16, u16)>,
@@ -150,8 +153,8 @@ impl RazerMessageBuilder {
             command_id: 0x05,
             ..Default::default()
         };
-        let dpi_x = clamp(dpi.x, 100, 35000);
-        let dpi_y = clamp(dpi.y, 100, 35000);
+        let dpi_x = clamp(dpi.x, RAZER_MOUSE_MIN_DPI, RAZER_MOUSE_MAX_DPI);
+        let dpi_y = clamp(dpi.y, RAZER_MOUSE_MIN_DPI, RAZER_MOUSE_MAX_DPI);
 
         msg.arguments[0] = var_store as u8;
         msg.arguments[1] = ((dpi_x >> 8) & 0x00FF) as u8;
@@ -327,7 +330,7 @@ impl Default for RazerMessageBuilder {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PollingRate {
     Normal(NormalPollingRate),
     Extended(ExtendedPollingRate),
@@ -360,7 +363,7 @@ impl std::fmt::Display for PollingRate {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum NormalPollingRate {
     Rate1000,
     Rate500,
@@ -390,7 +393,7 @@ impl TryFrom<u16> for NormalPollingRate {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ExtendedPollingRate {
     Rate8000,
     Rate4000,

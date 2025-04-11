@@ -10,7 +10,7 @@ use crate::{
     common::{
         decode_u16_from_bytes, send_razer_message, send_razer_message_and_wait_response, Dpi,
         DpiStages, NormalPollingRate, PollingRate, RazerMessageBuilder, VarStoreId,
-        RAZER_USB_INTERFACE_NUMBER,
+        RAZER_MOUSE_MAX_DPI, RAZER_MOUSE_MIN_DPI, RAZER_USB_INTERFACE_NUMBER,
     },
 };
 
@@ -28,6 +28,9 @@ pub trait FeatureSet: Send + Sync {
     }
     async fn set_dpi(&self, _: Dpi) -> Result<()> {
         Err(anyhow!("Unimplemented"))
+    }
+    fn get_dpi_range(&self) -> (u16, u16) {
+        (RAZER_MOUSE_MIN_DPI, RAZER_MOUSE_MAX_DPI)
     }
     async fn get_dpi_stages(&self) -> Result<DpiStages> {
         Err(anyhow!("Unimplemented"))

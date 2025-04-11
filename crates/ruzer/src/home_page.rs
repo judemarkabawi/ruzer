@@ -98,6 +98,9 @@ impl Component for HomePage {
         adw::Clamp {
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
+                set_spacing: 10,
+                set_margin_start: 20,
+                set_margin_end: 20,
                 gtk::Label {
                     set_label: "Select a Device",
                     set_valign: gtk::Align::Start,
