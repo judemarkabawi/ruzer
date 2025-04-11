@@ -1,0 +1,16 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/rust",
+  "name": "Rust",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "securityOpt": ["label=disable"],
+  "mounts": [
+    {
+      "source": "/dev/bus/usb/",
+      "target": "/dev/bus/usb/",
+      "type": "bind"
+    }
+  ],
+  "runArgs": ["--network=host"]
+}

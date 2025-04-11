@@ -1,0 +1,13 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = { workspace = true }
+
+[dependencies]
+# Internal
+driver = { workspace = true }
+
+# External
+clap = { workspace = true }
+nusb = { workspace = true }
+tokio = { workspace = true }
