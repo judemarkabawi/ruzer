@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use driver_macros::device_impl;
+use driver_macros::device_impls;
 use nusb::{DeviceInfo, Interface};
 
 use crate::{
@@ -183,20 +183,15 @@ async fn chroma_logo_matrix_effect(
     send_razer_message(interface, request).await
 }
 
-fn get_device_impl(product_id: u16, interface: Interface) -> Result<Box<dyn FeatureSet>> {
-    match product_id {
-        id if id == DEATHADDER_V2_PRO_WIRELESS => Ok(Box::new(DeathadderV2ProWireless(interface))),
-        _ => Err(anyhow!("Unsupported device")),
-    }
-}
-
-device_impl!(DEATHADDER_V2_PRO_WIRELESS 0x007D {
-    get_dpi: get_dpi,
-    set_dpi: set_dpi,
-    get_dpi_stages: get_dpi_stages,
-    set_dpi_stages: set_dpi_stages,
-    get_polling_rate: get_polling_rate,
-    get_battery_level: get_battery_level,
-    get_charging_status: get_charging_status,
-    chroma_logo_matrix_effect: chroma_logo_matrix_effect,
-});
+device_impls!([
+    DeathadderV2ProWireless 0x007D {
+        get_dpi: get_dpi,
+        set_dpi: set_dpi,
+        get_dpi_stages: get_dpi_stages,
+        set_dpi_stages: set_dpi_stages,
+        get_polling_rate: get_polling_rate,
+        get_battery_level: get_battery_level,
+        get_charging_status: get_charging_status,
+        chroma_logo_matrix_effect: chroma_logo_matrix_effect,
+    },
+]);
