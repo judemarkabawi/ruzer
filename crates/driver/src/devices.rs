@@ -13,12 +13,12 @@ use crate::{
     },
 };
 
-struct SupportedLedFeatures {
-    led: LedId,
-    features: Vec<ExtendedMatrixEffect>,
-}
+// struct SupportedLedFeatures {
+//     led: LedId,
+//     features: Vec<ExtendedMatrixEffect>,
+// }
 
-struct SupportedLeds(Vec<SupportedLedFeatures>);
+// struct SupportedLeds(Vec<SupportedLedFeatures>);
 
 #[async_trait]
 pub trait FeatureSet: Send + Sync {

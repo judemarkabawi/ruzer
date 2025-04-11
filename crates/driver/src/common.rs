@@ -330,20 +330,20 @@ impl Default for RazerMessageBuilder {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum PollingRate {
     Normal(NormalPollingRate),
     Extended(ExtendedPollingRate),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum NormalPollingRate {
     Rate1000,
     Rate500,
     Rate125,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ExtendedPollingRate {
     Rate8000,
     Rate4000,
