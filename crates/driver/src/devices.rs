@@ -278,7 +278,9 @@ async fn chroma_logo_matrix_effect_0x3f(
 }
 
 device_impls!([
-    DeathadderV2ProWireless 0x007D {
+    DeathadderV2ProWired    0x007C |
+    DeathadderV2ProWireless 0x007D
+    {
         get_dpi: get_dpi_0x3f,
         set_dpi: set_dpi_0x3f,
         get_dpi_stages: get_dpi_stages_0x3f,
