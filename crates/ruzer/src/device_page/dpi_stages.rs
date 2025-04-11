@@ -117,32 +117,34 @@ impl Component for DpiStagesList {
     }
 
     view! {
-        gtk::ListBox {
-            set_selection_mode: gtk::SelectionMode::None,
-            set_css_classes: &["boxed-list"],
-            adw::ActionRow {
-                set_title: "DPI Stages",
+        gtk::Box {
+            set_orientation: gtk::Orientation::Vertical,
+            set_spacing: 20,
+            gtk::Label {
+                set_label: "DPI Stages",
+                set_halign: gtk::Align::Start,
+                set_css_classes: &["heading"],
             },
-            gtk::ListBoxRow {
-                set_activatable: false,
-                model.dpi_stages.widget() -> &gtk::ListBox {
-                    set_selection_mode: gtk::SelectionMode::None,
-                    set_css_classes: &["boxed-list"],
-                },
+            model.dpi_stages.widget() -> &gtk::ListBox {
             },
-            #[name = "add_dpi_stage_entry"]
-            adw::EntryRow {
-                set_title: "Add DPI stage",
-                set_show_apply_button: true,
-                connect_apply[sender] => move |entry_row| {
-                    let dpi = entry_row.text().parse::<u16>().ok()
-                        .map(|dpi| dpi.into());
+            gtk::ListBox {
+                set_selection_mode: gtk::SelectionMode::None,
+                set_css_classes: &["boxed-list"],
+                adw::EntryRow {
+                    set_title: "Add DPI stage",
+                    set_show_apply_button: true,
+                    connect_apply[sender] => move |entry_row| {
+                        let dpi = entry_row.text().parse::<u16>().ok()
+                            .map(|dpi| dpi.into());
 
-                    if let Some(dpi) = dpi {
-                        sender.input(DpiStagesListMsg::Add(dpi))
-                    }
+                        if let Some(dpi) = dpi {
+                            sender.input(DpiStagesListMsg::Add(dpi))
+                        } else {
+                            entry_row.set_text("");
+                        }
+                    },
                 },
-            }
+            },
         },
     }
 }

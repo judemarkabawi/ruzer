@@ -10,7 +10,6 @@ mod dpi_stages;
 
 pub struct DevicePage {
     usb_device_info: Option<nusb::DeviceInfo>,
-    device_name: Option<String>,
     razer_device_info: driver::batched::DeviceInfo,
     dpi_stages_list: relm4::Controller<dpi_stages::DpiStagesList>,
     pending_changes: DeviceSettings,
@@ -54,7 +53,6 @@ impl Component for DevicePage {
                 });
         let model = Self {
             usb_device_info: None,
-            device_name: None,
             razer_device_info: driver::batched::DeviceInfo::default(),
             dpi_stages_list,
             pending_changes: DeviceSettings::default(),
@@ -131,11 +129,13 @@ impl Component for DevicePage {
                     set_orientation: gtk::Orientation::Vertical,
                     set_halign: gtk::Align::Center,
                     set_spacing: 5,
+                    // Device Name
                     gtk::Label {
                         #[watch]
-                        set_label?: &model.device_name,
+                        set_label?: &model.usb_device_info.clone().and_then(|info| info.product_string().map(|x| x.to_owned())),
                         set_css_classes: &["title-1"],
                     },
+                    // Battery Info
                     gtk::Box {
                         set_homogeneous: true,
                         gtk::Label {
@@ -158,8 +158,13 @@ impl Component for DevicePage {
                 },
                 // Controls Section
                 gtk::Box {
-                    set_spacing: 10,
+                    set_spacing: 20,
                     set_orientation: gtk::Orientation::Vertical,
+                    gtk::Label {
+                        set_label: "DPI and Polling Rate",
+                        set_halign: gtk::Align::Start,
+                        set_css_classes: &["heading"]
+                    },
                     gtk::ListBox {
                         set_selection_mode: gtk::SelectionMode::None,
                         set_css_classes: &["boxed-list"],
@@ -220,6 +225,7 @@ impl Component for DevicePage {
                             },
                         },
                     },
+                    // DPI Stages Section
                     model.dpi_stages_list.widget(),
                 },
                 // Apply Section
@@ -246,9 +252,6 @@ impl Component for DevicePage {
 
 impl DevicePage {
     fn update(&mut self, sender: &ComponentSender<DevicePage>, usb_device_info: DeviceInfo) {
-        self.device_name = usb_device_info
-            .product_string()
-            .map(|device_name| device_name.to_owned());
         self.usb_device_info = Some(usb_device_info.clone());
 
         // Run batched device info command on device if exists
