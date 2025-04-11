@@ -1,16 +1,18 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/rust",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "name": "Rust",
   "features": {
-    "ghcr.io/devcontainers/features/git:1": {}
+    "ghcr.io/devcontainers/features/rust:1": {}
   },
   "securityOpt": ["label=disable"],
   "mounts": [
-    {
-      "source": "/dev/bus/usb/",
-      "target": "/dev/bus/usb/",
-      "type": "bind"
-    }
+    "type=bind,src=/run/user/1000/wayland-0,dst=/run/user/1000/wayland-0"
   ],
-  "runArgs": ["--network=host"]
+  "remoteEnv": {
+    "XDG_RUNTIME_DIR": "/run/user/1000",
+    "WAYLAND_DISPLAY": "wayland-0"
+  },
+  "runArgs": ["--network=host", "--privileged"]
 }

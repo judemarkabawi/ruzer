@@ -1,0 +1,13 @@
+[package]
+name = "ruzer"
+version = "0.1.0"
+edition = { workspace = true }
+default-run = "ruzer"
+
+[dependencies]
+# Internal
+driver = { workspace = true }
+
+# External
+iced = { workspace = true }
+nusb = { workspace = true }

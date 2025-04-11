@@ -11,6 +11,34 @@ use syn::{
 
 struct DeviceDefs(Vec<SharedDeviceDef>);
 
+/// Definitions for one or more devices, along with their shared function mappings.
+struct SharedDeviceDef {
+    device_ids: Vec<DeviceId>,
+    def: DeviceDef,
+}
+
+struct SingleDeviceDef<'a> {
+    device_id: &'a DeviceId,
+    def: &'a DeviceDef,
+}
+
+/// Device name (ex: `DeathadderV2ProWireless`) and USB product id
+struct DeviceId {
+    name: Ident,
+    product_id: u16,
+}
+
+struct DeviceDef {
+    transaction_id: u8,
+    functions: Vec<FunctionMapping>,
+}
+
+/// A mapping of a trait method in `FeatureSet` to a concrete implementation
+struct FunctionMapping {
+    feature: Ident,
+    impl_fn: Ident,
+}
+
 impl Parse for DeviceDefs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let content;
@@ -21,12 +49,6 @@ impl Parse for DeviceDefs {
             .collect();
         Ok(DeviceDefs(device_defs))
     }
-}
-
-/// Definitions for one or more devices, along with their shared function mappings.
-struct SharedDeviceDef {
-    device_ids: Vec<DeviceId>,
-    functions: Vec<FunctionMapping>,
 }
 
 impl Parse for SharedDeviceDef {
@@ -40,13 +62,30 @@ impl Parse for SharedDeviceDef {
         let content;
         braced!(content in input);
 
+        // Transaction ID first
+        let transaction_id_ident = content.parse::<Ident>().map_err(|err| {
+            syn::Error::new(err.span(), "Expected \"transaction_id = 0xXX\" first")
+        })?;
+        if transaction_id_ident != "transaction_id" {
+            return Err(syn::Error::new(
+                transaction_id_ident.span(),
+                "Must write \"transaction_id\"",
+            ));
+        }
+        content.parse::<Token![=]>()?;
+        let transaction_id: u8 = content.parse::<LitInt>()?.base10_parse()?;
+        content.parse::<Token![,]>()?;
+
         // Zero or more feature: impl_fn mappings in the rbaces
         let functions = Punctuated::<FunctionMapping, Token![,]>::parse_terminated(&content)?
             .into_iter()
             .collect();
         Ok(SharedDeviceDef {
             device_ids,
-            functions,
+            def: DeviceDef {
+                transaction_id,
+                functions,
+            },
         })
     }
 }
@@ -55,22 +94,11 @@ impl SharedDeviceDef {
     /// This flattens a `SharedDeviceDef` into a list of `SingleDeviceDef`s that can be iterated over easier
     /// as if they were each just one device and its implementation.
     fn flatten_devices(&self) -> impl Iterator<Item = SingleDeviceDef<'_>> {
-        self.device_ids.iter().map(|device_id| SingleDeviceDef {
-            device_id,
-            functions: &self.functions,
+        self.device_ids.iter().map(|id| SingleDeviceDef {
+            device_id: id,
+            def: &self.def,
         })
     }
-}
-
-struct SingleDeviceDef<'a> {
-    device_id: &'a DeviceId,
-    functions: &'a [FunctionMapping],
-}
-
-/// Device name (ex: `DeathadderV2ProWireless`) and USB product id
-struct DeviceId {
-    name: Ident,
-    product_id: u16,
 }
 
 impl Parse for DeviceId {
@@ -97,18 +125,20 @@ impl DeviceId {
     }
 }
 
-/// A mapping of a trait method in `FeatureSet` to a concrete implementation
-struct FunctionMapping {
-    feature: Ident,
-    impl_fn: Ident,
-}
-
 impl Parse for FunctionMapping {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let feature = input.parse()?;
-        input.parse::<Token![:]>()?;
-        let impl_fn = input.parse()?;
-        Ok(FunctionMapping { feature, impl_fn })
+
+        if input.peek(Token![:]) {
+            // Specified impl
+            input.parse::<Token![:]>()?;
+            let impl_fn = input.parse()?;
+            Ok(FunctionMapping { feature, impl_fn })
+        } else {
+            // Default
+            let impl_fn = feature.clone();
+            Ok(FunctionMapping { feature, impl_fn })
+        }
     }
 }
 
@@ -126,11 +156,13 @@ impl Parse for FunctionMapping {
 ///     DeathadderV2ProWired    0x007C |
 ///     DeathadderV2ProWireless 0x007D
 ///     {
-///         get_dpi: get_dpi_0x3f,
-///         set_dpi: set_dpi_0x3f,
+///         transaction_id = 0x3f,
+///         get_dpi,
+///         set_dpi,
 ///     },
 ///     ViperMini 0x008A {
-///         get_dpi_stages: etc,
+///         transaction_id = 0xXX,
+///         get_dpi_stages: get_dpi_stages_custom_impl,
 ///     }
 /// ]);
 /// ```
@@ -147,19 +179,15 @@ fn device_impls_inner(device_defs: &DeviceDefs) -> TokenStream2 {
         .flat_map(|shared_def| shared_def.flatten_devices())
         .collect();
 
-    let device_ids = device_defs.iter().map(|device_def| device_def.device_id);
+    let device_ids = device_defs.iter().map(|def| def.device_id);
 
     // Make sure all product IDs are unique. Duplicates are a guaranteed programmer bug
     if let Some(error) = find_first_duplicate(device_ids) {
         return error.into_compile_error();
     }
 
-    let caps_names = device_defs
-        .iter()
-        .map(|device_def| device_def.device_id.caps_name());
-    let pascal_names = device_defs
-        .iter()
-        .map(|device_def| device_def.device_id.pascal_name());
+    let caps_names = device_defs.iter().map(|def| def.device_id.caps_name());
+    let pascal_names = device_defs.iter().map(|def| def.device_id.pascal_name());
     let device_impls = device_defs.iter().map(device_impl_inner);
 
     quote! {
@@ -179,61 +207,59 @@ fn device_impls_inner(device_defs: &DeviceDefs) -> TokenStream2 {
 }
 
 fn device_impl_inner(device_def: &SingleDeviceDef<'_>) -> TokenStream2 {
-    let SingleDeviceDef {
-        device_id,
-        functions,
-    } = device_def;
+    let SingleDeviceDef { device_id, def } = device_def;
     let caps_name = device_id.caps_name();
     let pascal_name = device_id.pascal_name();
     let product_id = device_id.product_id;
+    let transaction_id = def.transaction_id;
 
-    let fn_impls: syn::Result<Vec<TokenStream2>> = functions.iter().map(|fn_map| {
+    let fn_impls: syn::Result<Vec<TokenStream2>> = def.functions.iter().map(|fn_map| {
             let FunctionMapping { feature, impl_fn } = fn_map;
             let feature_str = feature.to_string();
             match feature_str.as_str() {
                 "get_dpi" => Ok(quote! {
                     async fn get_dpi(&self) -> Result<(u16, u16)> {
-                        #impl_fn(self.0.clone()).await
+                        #impl_fn(self.0.clone(), #transaction_id, VarStoreId::NoStore).await
                     }
                 }),
                 "set_dpi" => Ok(quote! {
                     async fn set_dpi(&self, dpi: (u16, u16)) -> Result<()> {
-                        #impl_fn(self.0.clone(), dpi).await
+                        #impl_fn(self.0.clone(), #transaction_id, VarStoreId::NoStore, dpi).await
                     }
                 }),
                 "get_dpi_stages" => Ok(quote! {
                     async fn get_dpi_stages(&self) -> Result<DpiStages> {
-                        #impl_fn(self.0.clone()).await
+                        #impl_fn(self.0.clone(), #transaction_id).await
                     }
                 }),
                 "set_dpi_stages" => Ok(quote! {
                     async fn set_dpi_stages(&self, dpi_stages: &DpiStages) -> Result<()> {
-                        #impl_fn(self.0.clone(), dpi_stages).await
+                        #impl_fn(self.0.clone(), #transaction_id, dpi_stages).await
                     }
                 }),
                 "get_polling_rate" => Ok(quote! {
                     async fn get_polling_rate(&self) -> Result<u16> {
-                        #impl_fn(self.0.clone()).await
+                        #impl_fn(self.0.clone(), #transaction_id).await
                     }
                 }),
                 "set_polling_rate" => Ok(quote! {
                     async fn set_polling_rate(&self, polling_rate: PollingRate) -> Result<()> {
-                        #impl_fn(self.0.clone(), polling_rate).await
+                        #impl_fn(self.0.clone(), #transaction_id, polling_rate).await
                     }
                 }),
                 "get_battery_level" => Ok(quote! {
                     async fn get_battery_level(&self) -> Result<f32> {
-                        #impl_fn(self.0.clone()).await
+                        #impl_fn(self.0.clone(), #transaction_id).await
                     }
                 }),
                 "get_charging_status" => Ok(quote! {
                     async fn get_charging_status(&self) -> Result<bool> {
-                        #impl_fn(self.0.clone()).await
+                        #impl_fn(self.0.clone(), #transaction_id).await
                     }
                 }),
                 "chroma_logo_matrix_effect" => Ok(quote! {
                     async fn chroma_logo_matrix_effect(&self, effect: ExtendedMatrixEffect) -> Result<()> {
-                        #impl_fn(self.0.clone(), effect).await
+                        #impl_fn(self.0.clone(), #transaction_id, effect).await
                     }
                 }),
                 _ => {
