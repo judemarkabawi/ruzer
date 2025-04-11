@@ -152,6 +152,11 @@ fn device_impl_inner(device_def: &DeviceDef) -> TokenStream2 {
                         #impl_fn(self.0.clone()).await
                     }
                 }),
+                "set_polling_rate" => Ok(quote! {
+                    async fn set_polling_rate(&self, polling_rate: PollingRate) -> Result<()> {
+                        #impl_fn(self.0.clone(), polling_rate).await
+                    }
+                }),
                 "get_battery_level" => Ok(quote! {
                     async fn get_battery_level(&self) -> Result<f32> {
                         #impl_fn(self.0.clone()).await

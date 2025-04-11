@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 use driver::{
     chroma::ExtendedMatrixEffect,
-    common::RAZER_USB_VENDOR_ID,
+    common::{NormalPollingRate, RAZER_USB_VENDOR_ID},
     devices::{RazerDevice, RazerDeviceClaimed},
 };
 
@@ -24,15 +24,6 @@ enum Command {
 struct DpiCommand {
     #[command(subcommand)]
     command: Option<DpiAction>,
-}
-
-impl DpiCommand {
-    fn command(&self) -> &DpiAction {
-        match &self.command {
-            Some(action) => action,
-            None => &DpiAction::Get,
-        }
-    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -90,7 +81,7 @@ struct PollingRateCommand {
 #[derive(Subcommand, Debug)]
 enum PollingRateAction {
     Get,
-    // TODO: Set { value: u16 },
+    Set { value: u16 },
 }
 
 #[tokio::main]
@@ -208,28 +199,28 @@ async fn handle_led_command(mouse: &RazerDeviceClaimed, command: LedCommand) {
 }
 
 async fn handle_dpi_command(mouse: &RazerDeviceClaimed, dpi_command: DpiCommand) {
-    match dpi_command.command() {
-        DpiAction::Get => {
+    match dpi_command.command {
+        Some(DpiAction::Get) | None => {
             let dpi = mouse.get_dpi().await.map_or_else(
                 |err| err.to_string(),
                 |dpi| format!("DPI (x, y): ({}, {})", dpi.0, dpi.1),
             );
             println!("{}", dpi);
         }
-        &DpiAction::Set { dpi } => {
+        Some(DpiAction::Set { dpi }) => {
             let result = mouse.set_dpi((dpi, dpi)).await;
             if let Err(err) = result {
                 println!("{}", err);
             }
         }
-        DpiAction::GetStages => {
+        Some(DpiAction::GetStages) => {
             let dpi_stages = mouse.get_dpi_stages().await.map_or_else(
                 |err| err.to_string(),
                 |dpi_stages| format!("{:?}", dpi_stages),
             );
             println!("{}", dpi_stages);
         }
-        DpiAction::SetStages { dpis: _ } => todo!(),
+        Some(DpiAction::SetStages { dpis: _ }) => todo!(),
     }
 }
 
@@ -249,6 +240,21 @@ async fn handle_polling_rate_command(mouse: RazerDeviceClaimed, command: Polling
                 |polling_rate| polling_rate.to_string(),
             );
             println!("Polling Rate: {}", polling_rate)
+        }
+        Some(PollingRateAction::Set { value }) => {
+            // TODO: support extended polling rates
+            let polling_rate = NormalPollingRate::try_from(value);
+            match polling_rate {
+                Ok(polling_rate) => {
+                    let result = mouse.set_polling_rate(polling_rate.into()).await;
+                    if let Err(err) = result {
+                        println!("{}", err);
+                    }
+                }
+                Err(_) => {
+                    println!("Invalid polling rate. Must be one of: [125, 500, 1000]");
+                }
+            }
         }
     }
 }

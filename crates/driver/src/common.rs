@@ -199,6 +199,42 @@ impl RazerMessageBuilder {
         }
     }
 
+    pub(crate) fn set_polling_rate(polling_rate: NormalPollingRate) -> Self {
+        let mut msg = Self {
+            data_size: 0x01,
+            command_class: 0x00,
+            command_id: 0x05,
+            ..Default::default()
+        };
+        msg.arguments[0] = match polling_rate {
+            NormalPollingRate::Rate1000 => 0x01,
+            NormalPollingRate::Rate500 => 0x02,
+            NormalPollingRate::Rate125 => 0x08,
+        };
+        msg
+    }
+
+    #[allow(unused)]
+    pub(crate) fn set_polling_rate_extended(polling_rate: ExtendedPollingRate) -> Self {
+        let mut msg = Self {
+            data_size: 0x02,
+            command_class: 0x00,
+            command_id: 0x40,
+            ..Default::default()
+        };
+        msg.arguments[0] = 0x00; // https://github.com/openrazer/openrazer/blob/16d13ef025d7cd32f03a6acc0548f9316e42b35a/driver/razermouse_driver.c#L1681
+        msg.arguments[1] = match polling_rate {
+            ExtendedPollingRate::Rate8000 => 0x01,
+            ExtendedPollingRate::Rate4000 => 0x02,
+            ExtendedPollingRate::Rate2000 => 0x04,
+            ExtendedPollingRate::Rate1000 => 0x08,
+            ExtendedPollingRate::Rate500 => 0x10,
+            ExtendedPollingRate::Rate250 => 0x20,
+            ExtendedPollingRate::Rate125 => 0x40,
+        };
+        msg
+    }
+
     pub(crate) fn chroma_extended_matrix_effect(
         var_store: VarStoreId,
         led_id: LedId,
@@ -269,6 +305,98 @@ impl Default for RazerMessageBuilder {
             command_class: 0,
             command_id: 0,
             arguments: [0; RAZER_REPORT_ARGUMENT_SIZE],
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum PollingRate {
+    Normal(NormalPollingRate),
+    Extended(ExtendedPollingRate),
+}
+
+#[derive(Copy, Clone)]
+pub enum NormalPollingRate {
+    Rate1000,
+    Rate500,
+    Rate125,
+}
+
+#[derive(Copy, Clone)]
+pub enum ExtendedPollingRate {
+    Rate8000,
+    Rate4000,
+    Rate2000,
+    Rate1000,
+    Rate500,
+    Rate250,
+    Rate125,
+}
+
+impl From<NormalPollingRate> for PollingRate {
+    fn from(value: NormalPollingRate) -> Self {
+        Self::Normal(value)
+    }
+}
+
+impl From<ExtendedPollingRate> for PollingRate {
+    fn from(value: ExtendedPollingRate) -> Self {
+        Self::Extended(value)
+    }
+}
+
+impl From<PollingRate> for u16 {
+    fn from(value: PollingRate) -> Self {
+        match value {
+            PollingRate::Normal(normal_polling_rate) => normal_polling_rate.into(),
+            PollingRate::Extended(extended_polling_rate) => extended_polling_rate.into(),
+        }
+    }
+}
+
+impl From<NormalPollingRate> for u16 {
+    fn from(value: NormalPollingRate) -> Self {
+        match value {
+            NormalPollingRate::Rate1000 => 1000,
+            NormalPollingRate::Rate500 => 500,
+            NormalPollingRate::Rate125 => 125,
+        }
+    }
+}
+
+impl TryFrom<u16> for NormalPollingRate {
+    type Error = ();
+
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
+        match value {
+            1000 => Ok(NormalPollingRate::Rate1000),
+            500 => Ok(NormalPollingRate::Rate500),
+            125 => Ok(NormalPollingRate::Rate125),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<NormalPollingRate> for ExtendedPollingRate {
+    fn from(value: NormalPollingRate) -> Self {
+        match value {
+            NormalPollingRate::Rate1000 => ExtendedPollingRate::Rate1000,
+            NormalPollingRate::Rate500 => ExtendedPollingRate::Rate500,
+            NormalPollingRate::Rate125 => ExtendedPollingRate::Rate125,
+        }
+    }
+}
+
+impl From<ExtendedPollingRate> for u16 {
+    fn from(value: ExtendedPollingRate) -> Self {
+        match value {
+            ExtendedPollingRate::Rate8000 => 8000,
+            ExtendedPollingRate::Rate4000 => 4000,
+            ExtendedPollingRate::Rate2000 => 2000,
+            ExtendedPollingRate::Rate1000 => 1000,
+            ExtendedPollingRate::Rate500 => 500,
+            ExtendedPollingRate::Rate250 => 250,
+            ExtendedPollingRate::Rate125 => 125,
         }
     }
 }
