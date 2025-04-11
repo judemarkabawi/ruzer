@@ -218,12 +218,12 @@ fn device_impl_inner(device_def: &SingleDeviceDef<'_>) -> TokenStream2 {
             let feature_str = feature.to_string();
             match feature_str.as_str() {
                 "get_dpi" => Ok(quote! {
-                    async fn get_dpi(&self) -> Result<(u16, u16)> {
+                    async fn get_dpi(&self) -> Result<Dpi> {
                         #impl_fn(self.0.clone(), #transaction_id, VarStoreId::NoStore).await
                     }
                 }),
                 "set_dpi" => Ok(quote! {
-                    async fn set_dpi(&self, dpi: (u16, u16)) -> Result<()> {
+                    async fn set_dpi(&self, dpi: Dpi) -> Result<()> {
                         #impl_fn(self.0.clone(), #transaction_id, VarStoreId::NoStore, dpi).await
                     }
                 }),

@@ -201,14 +201,14 @@ async fn handle_led_command(mouse: &RazerDeviceClaimed, command: LedCommand) {
 async fn handle_dpi_command(mouse: &RazerDeviceClaimed, dpi_command: DpiCommand) {
     match dpi_command.command {
         Some(DpiAction::Get) | None => {
-            let dpi = mouse.get_dpi().await.map_or_else(
-                |err| err.to_string(),
-                |dpi| format!("DPI (x, y): ({}, {})", dpi.0, dpi.1),
-            );
+            let dpi = mouse
+                .get_dpi()
+                .await
+                .map_or_else(|err| err.to_string(), |dpi| format!("DPI: {:?}", dpi));
             println!("{}", dpi);
         }
         Some(DpiAction::Set { dpi }) => {
-            let result = mouse.set_dpi((dpi, dpi)).await;
+            let result = mouse.set_dpi(dpi.into()).await;
             if let Err(err) = result {
                 println!("{}", err);
             }

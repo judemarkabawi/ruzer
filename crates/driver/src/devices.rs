@@ -8,8 +8,8 @@ use nusb::{DeviceInfo, Interface};
 use crate::{
     chroma::{ExtendedMatrixEffect, LedId},
     common::{
-        decode_u16_from_bytes, send_razer_message, send_razer_message_and_wait_response, DpiStages,
-        PollingRate, RazerMessageBuilder, VarStoreId, RAZER_USB_INTERFACE_NUMBER,
+        decode_u16_from_bytes, send_razer_message, send_razer_message_and_wait_response, Dpi,
+        DpiStages, PollingRate, RazerMessageBuilder, VarStoreId, RAZER_USB_INTERFACE_NUMBER,
     },
 };
 
@@ -22,10 +22,10 @@ struct SupportedLeds(Vec<SupportedLedFeatures>);
 
 #[async_trait]
 pub trait FeatureSet: Send + Sync {
-    async fn get_dpi(&self) -> Result<(u16, u16)> {
+    async fn get_dpi(&self) -> Result<Dpi> {
         Err(anyhow!("Unimplemented"))
     }
-    async fn set_dpi(&self, _: (u16, u16)) -> Result<()> {
+    async fn set_dpi(&self, _: Dpi) -> Result<()> {
         Err(anyhow!("Unimplemented"))
     }
     async fn get_dpi_stages(&self) -> Result<DpiStages> {
@@ -78,11 +78,7 @@ impl Deref for RazerDeviceClaimed {
     }
 }
 
-async fn get_dpi(
-    interface: Interface,
-    transaction_id: u8,
-    var_store: VarStoreId,
-) -> Result<(u16, u16)> {
+async fn get_dpi(interface: Interface, transaction_id: u8, var_store: VarStoreId) -> Result<Dpi> {
     let request = RazerMessageBuilder::get_dpi(var_store)
         .with_transaction_id(transaction_id)
         .build();
@@ -90,14 +86,14 @@ async fn get_dpi(
 
     let dpi_x: u16 = decode_u16_from_bytes(&response.arguments()[1..=2]);
     let dpi_y: u16 = decode_u16_from_bytes(&response.arguments()[3..=4]);
-    Ok((dpi_x, dpi_y))
+    Ok((dpi_x, dpi_y).into())
 }
 
 async fn set_dpi(
     interface: Interface,
     transaction_id: u8,
     var_store: VarStoreId,
-    dpi: (u16, u16),
+    dpi: Dpi,
 ) -> Result<()> {
     let request = RazerMessageBuilder::set_dpi(var_store, dpi)
         .with_transaction_id(transaction_id)

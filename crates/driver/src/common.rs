@@ -46,6 +46,27 @@ impl RazerMessage {
 }
 
 #[derive(Clone, Debug)]
+pub struct Dpi {
+    x: u16,
+    y: u16,
+}
+
+impl From<u16> for Dpi {
+    fn from(value: u16) -> Self {
+        Dpi { x: value, y: value }
+    }
+}
+
+impl From<(u16, u16)> for Dpi {
+    fn from(value: (u16, u16)) -> Self {
+        Dpi {
+            x: value.0,
+            y: value.1,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct DpiStages {
     pub(crate) active: u8,
     pub(crate) stages: Vec<(u16, u16)>,
@@ -125,15 +146,15 @@ impl RazerMessageBuilder {
         msg
     }
 
-    pub(crate) fn set_dpi(var_store: VarStoreId, (dpi_x, dpi_y): (u16, u16)) -> Self {
+    pub(crate) fn set_dpi(var_store: VarStoreId, dpi: Dpi) -> Self {
         let mut msg = Self {
             data_size: 0x07,
             command_class: 0x04,
             command_id: 0x05,
             ..Default::default()
         };
-        let dpi_x = clamp(dpi_x, 100, 35000);
-        let dpi_y = clamp(dpi_y, 100, 35000);
+        let dpi_x = clamp(dpi.x, 100, 35000);
+        let dpi_y = clamp(dpi.y, 100, 35000);
 
         msg.arguments[0] = var_store as u8;
         msg.arguments[1] = ((dpi_x >> 8) & 0x00FF) as u8;
