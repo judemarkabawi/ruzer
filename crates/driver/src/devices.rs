@@ -9,7 +9,8 @@ use crate::{
     chroma::{ExtendedMatrixEffect, LedId},
     common::{
         decode_u16_from_bytes, send_razer_message, send_razer_message_and_wait_response, Dpi,
-        DpiStages, PollingRate, RazerMessageBuilder, VarStoreId, RAZER_USB_INTERFACE_NUMBER,
+        DpiStages, NormalPollingRate, PollingRate, RazerMessageBuilder, VarStoreId,
+        RAZER_USB_INTERFACE_NUMBER,
     },
 };
 
@@ -34,7 +35,7 @@ pub trait FeatureSet: Send + Sync {
     async fn set_dpi_stages(&self, _: &DpiStages) -> Result<()> {
         Err(anyhow!("Unimplemented"))
     }
-    async fn get_polling_rate(&self) -> Result<u16> {
+    async fn get_polling_rate(&self) -> Result<PollingRate> {
         Err(anyhow!("Unimplemented"))
     }
     async fn set_polling_rate(&self, _: PollingRate) -> Result<()> {
@@ -153,16 +154,16 @@ async fn set_dpi_stages(
     send_razer_message(interface, request).await
 }
 
-async fn get_polling_rate(interface: Interface, transaction_id: u8) -> Result<u16> {
+async fn get_polling_rate(interface: Interface, transaction_id: u8) -> Result<PollingRate> {
     let request = RazerMessageBuilder::get_polling_rate()
         .with_transaction_id(transaction_id)
         .build();
     let response = send_razer_message_and_wait_response(interface, request).await?;
 
     match response.arguments()[0] {
-        0x01 => Ok(1000),
-        0x02 => Ok(500),
-        0x08 => Ok(125),
+        0x01 => Ok(NormalPollingRate::Rate1000.into()),
+        0x02 => Ok(NormalPollingRate::Rate500.into()),
+        0x08 => Ok(NormalPollingRate::Rate125.into()),
         _ => Err(anyhow!("Invalid polling rate response")),
     }
 }

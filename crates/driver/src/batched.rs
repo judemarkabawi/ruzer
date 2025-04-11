@@ -1,13 +1,13 @@
 use crate::{
-    common::{Dpi, DpiStages},
+    common::{Dpi, DpiStages, PollingRate},
     devices::FeatureSet,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DeviceInfo {
     pub dpi: Option<Dpi>,
     pub dpi_stages: Option<DpiStages>,
-    pub polling_rate: Option<u16>,
+    pub polling_rate: Option<PollingRate>,
     pub battery_level: Option<f32>,
     pub charging_status: Option<bool>,
 }

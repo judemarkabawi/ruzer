@@ -238,7 +238,7 @@ fn device_impl_inner(device_def: &SingleDeviceDef<'_>) -> TokenStream2 {
                     }
                 }),
                 "get_polling_rate" => Ok(quote! {
-                    async fn get_polling_rate(&self) -> Result<u16> {
+                    async fn get_polling_rate(&self) -> Result<PollingRate> {
                         #impl_fn(self.0.clone(), #transaction_id).await
                     }
                 }),

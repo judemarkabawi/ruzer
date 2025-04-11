@@ -333,22 +333,13 @@ pub enum PollingRate {
     Extended(ExtendedPollingRate),
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum NormalPollingRate {
-    Rate1000,
-    Rate500,
-    Rate125,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum ExtendedPollingRate {
-    Rate8000,
-    Rate4000,
-    Rate2000,
-    Rate1000,
-    Rate500,
-    Rate250,
-    Rate125,
+impl From<PollingRate> for u16 {
+    fn from(value: PollingRate) -> Self {
+        match value {
+            PollingRate::Normal(normal_polling_rate) => normal_polling_rate.into(),
+            PollingRate::Extended(extended_polling_rate) => extended_polling_rate.into(),
+        }
+    }
 }
 
 impl From<NormalPollingRate> for PollingRate {
@@ -363,13 +354,17 @@ impl From<ExtendedPollingRate> for PollingRate {
     }
 }
 
-impl From<PollingRate> for u16 {
-    fn from(value: PollingRate) -> Self {
-        match value {
-            PollingRate::Normal(normal_polling_rate) => normal_polling_rate.into(),
-            PollingRate::Extended(extended_polling_rate) => extended_polling_rate.into(),
-        }
+impl std::fmt::Display for PollingRate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(u16::from(*self).to_string().as_ref())
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum NormalPollingRate {
+    Rate1000,
+    Rate500,
+    Rate125,
 }
 
 impl From<NormalPollingRate> for u16 {
@@ -395,14 +390,15 @@ impl TryFrom<u16> for NormalPollingRate {
     }
 }
 
-impl From<NormalPollingRate> for ExtendedPollingRate {
-    fn from(value: NormalPollingRate) -> Self {
-        match value {
-            NormalPollingRate::Rate1000 => ExtendedPollingRate::Rate1000,
-            NormalPollingRate::Rate500 => ExtendedPollingRate::Rate500,
-            NormalPollingRate::Rate125 => ExtendedPollingRate::Rate125,
-        }
-    }
+#[derive(Copy, Clone, Debug)]
+pub enum ExtendedPollingRate {
+    Rate8000,
+    Rate4000,
+    Rate2000,
+    Rate1000,
+    Rate500,
+    Rate250,
+    Rate125,
 }
 
 impl From<ExtendedPollingRate> for u16 {
@@ -415,6 +411,23 @@ impl From<ExtendedPollingRate> for u16 {
             ExtendedPollingRate::Rate500 => 500,
             ExtendedPollingRate::Rate250 => 250,
             ExtendedPollingRate::Rate125 => 125,
+        }
+    }
+}
+
+impl TryFrom<u16> for ExtendedPollingRate {
+    type Error = ();
+
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
+        match value {
+            8000 => Ok(ExtendedPollingRate::Rate8000),
+            4000 => Ok(ExtendedPollingRate::Rate4000),
+            2000 => Ok(ExtendedPollingRate::Rate2000),
+            1000 => Ok(ExtendedPollingRate::Rate1000),
+            500 => Ok(ExtendedPollingRate::Rate500),
+            250 => Ok(ExtendedPollingRate::Rate250),
+            125 => Ok(ExtendedPollingRate::Rate125),
+            _ => Err(()),
         }
     }
 }

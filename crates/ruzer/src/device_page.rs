@@ -1,5 +1,5 @@
 use adw::prelude::*;
-use driver::batched::BatchedFeatureSet;
+use driver::{batched::BatchedFeatureSet, common::NormalPollingRate};
 use nusb::DeviceInfo;
 use relm4::prelude::*;
 
@@ -8,11 +8,13 @@ pub struct DevicePage {
     usb_device_info: Option<nusb::DeviceInfo>,
     device_name: Option<String>,
     razer_device_info: Option<driver::batched::DeviceInfo>,
+    pending_changes: driver::batched::DeviceInfo,
 }
 
 #[derive(Debug)]
 pub enum DevicePageMsg {
     PageUpdate(DeviceInfo),
+    SelectPollingRate(driver::common::PollingRate),
 }
 
 #[derive(Debug)]
@@ -30,7 +32,7 @@ impl Component for DevicePage {
     fn init(
         _init: Self::Init,
         root: Self::Root,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = Self::default();
         let widgets = view_output!();
@@ -55,6 +57,9 @@ impl Component for DevicePage {
                         DevicePageCommand::Data(device_claimed.get_batched().await)
                     });
                 }
+            }
+            DevicePageMsg::SelectPollingRate(polling_rate) => {
+                self.pending_changes.polling_rate = Some(polling_rate);
             }
         }
     }
@@ -87,7 +92,7 @@ impl Component for DevicePage {
                 gtk::Label {
                     set_halign: gtk::Align::Start,
                     #[watch]
-                    set_label: &match model.razer_device_info.as_ref().map(|info| info.battery_level).flatten() {
+                    set_label: &match model.razer_device_info.as_ref().and_then(|info| info.battery_level) {
                         Some(level) => format!("Battery: {:.0}%", level),
                         None => "Battery: N/A".into(),
                     },
@@ -104,10 +109,39 @@ impl Component for DevicePage {
             gtk::ListBox {
                 set_selection_mode: gtk::SelectionMode::None,
                 set_css_classes: &["boxed-list"],
+                #[name = "polling_rate_selection"]
                 adw::ComboRow {
+                    // TODO: Handle extended polling rates
                     set_title: "Polling Rate",
+                    #[watch]
+                    set_selected: {
+                        // In StringList model below
+                        let rate_to_index = |rate| match rate {
+                            driver::common::PollingRate::Normal(NormalPollingRate::Rate125) => 0,
+                            driver::common::PollingRate::Normal(NormalPollingRate::Rate500) => 1,
+                            driver::common::PollingRate::Normal(NormalPollingRate::Rate1000) => 2,
+                            _ => 0,
+                        };
+                        // Use current selected rate if set, otherwise use device info
+                        match model.pending_changes.polling_rate {
+                            Some(polling_rate) => rate_to_index(polling_rate),
+                            None => model.razer_device_info.as_ref().and_then(|info| info.polling_rate).map(rate_to_index).unwrap_or(0)
+                        }
+                    },
                     #[wrap(Some)]
                     set_model = &gtk::StringList::new(&["125", "500", "1000"]),
+                    connect_selected_notify[sender] => move |combo_row| {
+                        let selected_string = combo_row
+                            .selected_item()
+                            .and_then(|obj| obj.downcast::<gtk::StringObject>().ok())
+                            .map(|s| Into::<String>::into(s.string()));
+                        let polling_rate = selected_string
+                            .and_then(|s| s.parse::<u16>().ok())
+                            .and_then(|dpi| NormalPollingRate::try_from(dpi).ok());
+                        if let Some(polling_rate) = polling_rate {
+                            sender.input(DevicePageMsg::SelectPollingRate(polling_rate.into()));
+                        }
+                    }
                 }
             }
         }

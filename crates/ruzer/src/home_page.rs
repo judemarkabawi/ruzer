@@ -37,7 +37,7 @@ impl FactoryComponent for DeviceListing {
     view! {
         adw::ActionRow {
             set_activatable: true,
-            set_title: self.device.product_string().unwrap_or("Unknown Device").into(),
+            set_title: self.device.product_string().unwrap_or("Unknown Device"),
             connect_activated[sender, device = self.device.clone()] => move |_| {
                 sender.output(HomePageOutput::SelectDevice(device.clone())).unwrap();
             }
