@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+#[derive(Clone, Debug)]
 #[repr(u8)]
 pub enum LedId {
     // Zero = 0x00,
@@ -10,7 +13,7 @@ pub enum LedId {
 }
 
 #[derive(Copy, Clone)]
-pub enum EffectBreathing {
+pub enum BreathingEffect {
     Single(Color),
     Dual(Color, Color),
     Random,
@@ -20,7 +23,7 @@ pub enum EffectBreathing {
 pub enum ExtendedMatrixEffect {
     None,
     Static(Color),
-    Breathing(EffectBreathing),
+    Breathing(BreathingEffect),
     Spectrum,
     // Wave = 0x04,
     /// Reactive effect, color with speed
@@ -46,6 +49,18 @@ pub struct Color {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+}
+
+impl FromStr for Color {
+    type Err = ();
+
+    /// Parse a hex code starting with "#" (ex: `#0cff1d`)
+    fn from_str(hex_code: &str) -> Result<Self, Self::Err> {
+        let r: u8 = u8::from_str_radix(&hex_code[1..3], 16).map_err(|_| ())?;
+        let g: u8 = u8::from_str_radix(&hex_code[3..5], 16).map_err(|_| ())?;
+        let b: u8 = u8::from_str_radix(&hex_code[5..7], 16).map_err(|_| ())?;
+        Ok(Color { r, g, b })
+    }
 }
 
 impl From<(u8, u8, u8)> for Color {

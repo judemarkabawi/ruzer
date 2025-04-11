@@ -11,7 +11,7 @@ use nusb::{
 use anyhow::{anyhow, Error, Result};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use crate::chroma::{EffectBreathing, ExtendedMatrixEffect, LedId};
+use crate::chroma::{BreathingEffect, ExtendedMatrixEffect, LedId};
 
 pub const RAZER_USB_VENDOR_ID: u16 = 0x1532;
 pub(crate) const RAZER_REPORT_SIZE: usize = size_of::<RazerMessage>();
@@ -223,19 +223,19 @@ impl RazerMessageBuilder {
                 msg.data_size = 0x09;
             }
             ExtendedMatrixEffect::Breathing(effect) => match effect {
-                EffectBreathing::Single(color) => {
+                BreathingEffect::Single(color) => {
                     let payload = [0x01, 0x00, 0x01, color.r, color.g, color.b];
                     msg.arguments[3..=8].copy_from_slice(&payload);
                     msg.data_size = 0x09;
                 }
-                EffectBreathing::Dual(color, color1) => {
+                BreathingEffect::Dual(color, color1) => {
                     let payload = [
                         0x02, 0x00, 0x02, color.r, color.g, color.b, color1.r, color1.g, color1.b,
                     ];
                     msg.arguments[3..=11].copy_from_slice(&payload);
                     msg.data_size = 0x0C;
                 }
-                EffectBreathing::Random => {
+                BreathingEffect::Random => {
                     msg.data_size = 0x06;
                 }
             },

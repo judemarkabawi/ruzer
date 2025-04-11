@@ -1,12 +1,13 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use driver::{
+    chroma::ExtendedMatrixEffect,
     common::RAZER_USB_VENDOR_ID,
     devices::{RazerDevice, RazerDeviceClaimed},
 };
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Args {
+struct Cli {
     #[command(subcommand)]
     command: Command,
 }
@@ -15,7 +16,7 @@ struct Args {
 enum Command {
     Dpi(DpiCommand),
     Info,
-    Led,
+    Led(LedCommand),
     PollingRate(PollingRateCommand),
 }
 
@@ -42,6 +43,44 @@ enum DpiAction {
     SetStages { dpis: Vec<u16> },
 }
 
+#[derive(Args, Debug)]
+struct LedCommand {
+    #[arg(short, long)]
+    led: Option<Led>,
+    #[command(subcommand)]
+    effect: LedEffect,
+}
+
+#[derive(Subcommand, Clone, Debug)]
+enum LedEffect {
+    Off,
+    Static {
+        #[arg(short, long)]
+        color: String,
+    },
+    #[command(subcommand)]
+    Breathing(BreathingEffect),
+    Spectrum,
+    Reactive {
+        #[arg(short, long)]
+        color: String,
+        #[arg(short, long)]
+        speed: u8,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug)]
+enum BreathingEffect {
+    Random,
+    Single { color: String },
+    Dual { color1: String, color2: String },
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum Led {
+    Logo,
+}
+
 #[derive(Parser, Debug)]
 struct PollingRateCommand {
     #[command(subcommand)]
@@ -56,7 +95,7 @@ enum PollingRateAction {
 
 #[tokio::main]
 async fn main() {
-    let args = Args::parse();
+    let args = Cli::parse();
 
     let mouse_info = nusb::list_devices()
         .unwrap()
@@ -72,14 +111,103 @@ async fn main() {
 
 async fn handle_command(mouse: RazerDeviceClaimed, command: Command) {
     match command {
-        Command::Dpi(dpi_command) => handle_dpi(&mouse, dpi_command).await,
-        Command::Info => handle_info(&mouse).await,
-        Command::Led => todo!(),
-        Command::PollingRate(command) => handle_polling_rate(mouse, command).await,
+        Command::Dpi(command) => handle_dpi_command(&mouse, command).await,
+        Command::Info => handle_info_command(&mouse).await,
+        Command::Led(command) => handle_led_command(&mouse, command).await,
+        Command::PollingRate(command) => handle_polling_rate_command(mouse, command).await,
     }
 }
 
-async fn handle_dpi(mouse: &RazerDeviceClaimed, dpi_command: DpiCommand) {
+async fn handle_led_command(mouse: &RazerDeviceClaimed, command: LedCommand) {
+    match command.effect {
+        LedEffect::Off => {
+            let result = mouse
+                .chroma_logo_matrix_effect(ExtendedMatrixEffect::None)
+                .await;
+            if let Err(err) = result {
+                println!("{}", err);
+            }
+        }
+        LedEffect::Static { color } => {
+            let color = color.parse();
+            match color {
+                Ok(color) => {
+                    let result = mouse
+                        .chroma_logo_matrix_effect(ExtendedMatrixEffect::Static(color))
+                        .await;
+                    if let Err(err) = result {
+                        println!("{}", err);
+                    }
+                }
+                Err(_) => {
+                    println!("{}", color_err_msg());
+                }
+            }
+        }
+        LedEffect::Breathing(breathing_effect) => {
+            let effect = match breathing_effect {
+                BreathingEffect::Random => {
+                    ExtendedMatrixEffect::Breathing(driver::chroma::BreathingEffect::Random)
+                }
+                BreathingEffect::Single { color } => {
+                    let color = color.parse();
+                    match color {
+                        Ok(color) => ExtendedMatrixEffect::Breathing(
+                            driver::chroma::BreathingEffect::Single(color),
+                        ),
+                        Err(_) => {
+                            println!("{}", color_err_msg());
+                            return;
+                        }
+                    }
+                }
+                BreathingEffect::Dual { color1, color2 } => {
+                    let color1 = color1.parse();
+                    let color2 = color2.parse();
+                    match (color1, color2) {
+                        (Ok(color1), Ok(color2)) => ExtendedMatrixEffect::Breathing(
+                            driver::chroma::BreathingEffect::Dual(color1, color2),
+                        ),
+                        _ => {
+                            println!("{}", color_err_msg());
+                            return;
+                        }
+                    }
+                }
+            };
+            let result = mouse.chroma_logo_matrix_effect(effect).await;
+            if let Err(err) = result {
+                println!("{}", err);
+            }
+        }
+        LedEffect::Spectrum => {
+            let result = mouse
+                .chroma_logo_matrix_effect(ExtendedMatrixEffect::Spectrum)
+                .await;
+            if let Err(err) = result {
+                println!("{}", err);
+            }
+        }
+        LedEffect::Reactive { color, speed } => {
+            let color = color.parse();
+            match color {
+                Ok(color) => {
+                    let result = mouse
+                        .chroma_logo_matrix_effect(ExtendedMatrixEffect::Reactive(color, speed))
+                        .await;
+                    if let Err(err) = result {
+                        println!("{}", err);
+                    }
+                }
+                Err(_) => {
+                    println!("{}", color_err_msg())
+                }
+            }
+        }
+    }
+}
+
+async fn handle_dpi_command(mouse: &RazerDeviceClaimed, dpi_command: DpiCommand) {
     match dpi_command.command() {
         DpiAction::Get => {
             let dpi = mouse.get_dpi().await.map_or_else(
@@ -105,7 +233,7 @@ async fn handle_dpi(mouse: &RazerDeviceClaimed, dpi_command: DpiCommand) {
     }
 }
 
-async fn handle_info(mouse: &RazerDeviceClaimed) {
+async fn handle_info_command(mouse: &RazerDeviceClaimed) {
     let battery_level = mouse.get_battery_level().await.map_or_else(
         |err| err.to_string(),
         |battery_level| battery_level.to_string(),
@@ -113,14 +241,18 @@ async fn handle_info(mouse: &RazerDeviceClaimed) {
     println!("Battery Level: {}", battery_level);
 }
 
-async fn handle_polling_rate(mouse: RazerDeviceClaimed, command: PollingRateCommand) {
+async fn handle_polling_rate_command(mouse: RazerDeviceClaimed, command: PollingRateCommand) {
     match command.command {
         Some(PollingRateAction::Get) | None => {
             let polling_rate = mouse.get_polling_rate().await.map_or_else(
                 |err| err.to_string(),
                 |polling_rate| polling_rate.to_string(),
             );
-            println!("Polling rate: {}", polling_rate)
+            println!("Polling Rate: {}", polling_rate)
         }
     }
+}
+
+fn color_err_msg() -> &'static str {
+    "Please specify a color in hex (ex: #0cff1d)"
 }
