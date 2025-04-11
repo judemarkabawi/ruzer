@@ -3,7 +3,7 @@ use crate::{
     devices::FeatureSet,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DeviceInfo {
     pub dpi: Option<Dpi>,
     pub dpi_range: (u16, u16),

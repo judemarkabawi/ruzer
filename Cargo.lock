@@ -995,6 +995,7 @@ dependencies = [
 name = "ruzer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "driver",
  "gtk4",
  "libadwaita",

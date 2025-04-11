@@ -128,22 +128,21 @@ async fn get_dpi_stages(interface: Interface, transaction_id: u8) -> Result<DpiS
     //
     // 03    third DPI stage
     // ...
-    let active_stage = response.arguments()[1];
+
+    // 1-indexed, convert to 0-indexed
+    let active_stage = response.arguments()[1] - 1;
     let num_stages = response.arguments()[2] as usize;
     let result = response.arguments()[3..]
         .chunks_exact(0x07)
         .take(num_stages)
         .map(|dpi_stage| {
-            let dpi_x = decode_u16_from_bytes(&dpi_stage[1..=2]);
-            let dpi_y = decode_u16_from_bytes(&dpi_stage[3..=4]);
-            (dpi_x, dpi_y)
+            let x = decode_u16_from_bytes(&dpi_stage[1..=2]);
+            let y = decode_u16_from_bytes(&dpi_stage[3..=4]);
+            Dpi { x, y }
         })
         .collect();
 
-    Ok(DpiStages {
-        active: active_stage,
-        stages: result,
-    })
+    DpiStages::new(active_stage, result)
 }
 
 async fn set_dpi_stages(

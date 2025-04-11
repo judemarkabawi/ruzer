@@ -9,6 +9,7 @@ default-run = "ruzer"
 driver = { workspace = true }
 
 # External
+anyhow = { workspace = true }
 adw = { workspace = true }
 gtk = { workspace = true }
 nusb = { workspace = true }

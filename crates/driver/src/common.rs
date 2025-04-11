@@ -15,7 +15,7 @@ pub(crate) const RAZER_REPORT_SIZE: usize = size_of::<RazerMessage>();
 pub(crate) const RAZER_REPORT_ARGUMENT_SIZE: usize = 80;
 pub(crate) const RAZER_USB_INTERFACE_NUMBER: u8 = 0x00;
 pub(crate) const RAZER_MOUSE_WAIT_TIME: Duration = Duration::from_millis(60);
-pub(crate) const RAZER_MOUSE_MAX_DPI_STAGES: u8 = 5;
+pub const RAZER_MOUSE_MAX_DPI_STAGES: u8 = 5;
 
 pub(crate) const RAZER_MOUSE_MIN_DPI: u16 = 100;
 pub(crate) const RAZER_MOUSE_MAX_DPI: u16 = 35000;
@@ -68,19 +68,35 @@ impl From<(u16, u16)> for Dpi {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DpiStages {
-    pub(crate) active: u8,
-    pub(crate) stages: Vec<(u16, u16)>,
+    active: u8,
+    stages: Vec<Dpi>,
 }
 
 impl DpiStages {
-    pub fn new(active: u8, stages: Vec<(u16, u16)>) -> Result<DpiStages> {
+    /// `active` should be a 0-based index
+    pub fn new(active: u8, stages: Vec<Dpi>) -> Result<DpiStages> {
         if stages.is_empty() || stages.len() > RAZER_MOUSE_MAX_DPI_STAGES as usize {
-            Err(anyhow!("DpiStages: Need 1 <= # of DPI stages <= 256"))
-        } else if active < 1 || active > stages.len() as u8 {
+            Err(anyhow!(
+                "DpiStages: Need 1 <= # of DPI stages <= {}",
+                RAZER_MOUSE_MAX_DPI_STAGES
+            ))
+        } else if active > stages.len() as u8 {
             Err(anyhow!("DpiStages: Need 1 <= active stage <= # of stages"))
         } else {
             Ok(DpiStages { active, stages })
         }
+    }
+
+    pub fn active(&self) -> u8 {
+        self.active
+    }
+
+    fn active_1_idx(&self) -> u8 {
+        self.active + 1
+    }
+
+    pub fn stages(&self) -> &[Dpi] {
+        &self.stages
     }
 }
 
@@ -186,7 +202,7 @@ impl RazerMessageBuilder {
         };
 
         msg.arguments[0] = var_store as u8;
-        msg.arguments[1] = dpi_stages.active;
+        msg.arguments[1] = dpi_stages.active_1_idx();
 
         let num_stages = dpi_stages.stages.len();
         msg.arguments[2] = num_stages as u8;
@@ -201,10 +217,10 @@ impl RazerMessageBuilder {
             .take(num_stages)
             .enumerate()
             .for_each(|(i, chunk)| {
-                let (dpi_x, dpi_y) = dpi_stages.stages[i];
+                let Dpi { x, y } = dpi_stages.stages[i];
                 chunk[0] = i as u8;
-                chunk[1..=2].copy_from_slice(&encode_u16_as_bytes(dpi_x));
-                chunk[3..=4].copy_from_slice(&encode_u16_as_bytes(dpi_y));
+                chunk[1..=2].copy_from_slice(&encode_u16_as_bytes(x));
+                chunk[3..=4].copy_from_slice(&encode_u16_as_bytes(y));
                 chunk[5] = 0;
                 chunk[6] = 0;
             });

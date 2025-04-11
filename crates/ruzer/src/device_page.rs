@@ -6,19 +6,22 @@ use driver::{
 use nusb::DeviceInfo;
 use relm4::prelude::*;
 
-#[derive(Default)]
+mod dpi_stages;
+
 pub struct DevicePage {
     usb_device_info: Option<nusb::DeviceInfo>,
     device_name: Option<String>,
     razer_device_info: driver::batched::DeviceInfo,
+    dpi_stages_list: relm4::Controller<dpi_stages::DpiStagesList>,
     pending_changes: DeviceSettings,
 }
 
 #[derive(Debug)]
 pub enum DevicePageMsg {
-    Update(DeviceInfo),
+    Update(nusb::DeviceInfo),
     SelectPollingRate(driver::common::PollingRate),
-    SelectDpi(Option<u16>),
+    SetDpi(Option<u16>),
+    SetDpiStages(driver::common::DpiStages),
     Cancel,
     Apply,
 }
@@ -40,7 +43,21 @@ impl Component for DevicePage {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Self::default();
+        let dpi_stages_list =
+            dpi_stages::DpiStagesList::builder()
+                .launch(())
+                .forward(sender.input_sender(), |msg| match msg {
+                    dpi_stages::DpiStagesListOutput::UpdatePending(dpi_stages) => {
+                        DevicePageMsg::SetDpiStages(dpi_stages)
+                    }
+                });
+        let model = Self {
+            usb_device_info: None,
+            device_name: None,
+            razer_device_info: driver::batched::DeviceInfo::default(),
+            dpi_stages_list,
+            pending_changes: DeviceSettings::default(),
+        };
         let widgets = view_output!();
 
         ComponentParts { model, widgets }
@@ -54,7 +71,7 @@ impl Component for DevicePage {
             DevicePageMsg::SelectPollingRate(polling_rate) => {
                 self.pending_changes.polling_rate = Some(polling_rate);
             }
-            DevicePageMsg::SelectDpi(dpi) => {
+            DevicePageMsg::SetDpi(dpi) => {
                 let dpi_range = self.razer_device_info.dpi_range;
                 let dpi = dpi
                     .filter(|dpi| dpi_range.0 <= *dpi && *dpi <= dpi_range.1)
@@ -66,6 +83,13 @@ impl Component for DevicePage {
             }
             DevicePageMsg::Cancel => {
                 self.pending_changes = DeviceSettings::default();
+                if let Some(dpi_stages) = self.razer_device_info.dpi_stages.clone() {
+                    self.dpi_stages_list
+                        .emit(dpi_stages::DpiStagesListMsg::Update(dpi_stages))
+                }
+            }
+            DevicePageMsg::SetDpiStages(dpi_stages) => {
+                self.pending_changes.dpi_stages = Some(dpi_stages);
             }
         }
     }
@@ -80,7 +104,11 @@ impl Component for DevicePage {
             DevicePageCommand::Update(razer_device_info) => {
                 // Reset page and update with new device info
                 self.pending_changes = DeviceSettings::default();
-                self.razer_device_info = razer_device_info;
+                self.razer_device_info = razer_device_info.clone();
+                if let Some(dpi_stages) = razer_device_info.dpi_stages {
+                    self.dpi_stages_list
+                        .emit(dpi_stages::DpiStagesListMsg::Update(dpi_stages))
+                }
             }
         }
     }
@@ -124,6 +152,7 @@ impl Component for DevicePage {
                 },
                 // Controls Section
                 gtk::Box {
+                    set_spacing: 10,
                     set_orientation: gtk::Orientation::Vertical,
                     gtk::ListBox {
                         set_selection_mode: gtk::SelectionMode::None,
@@ -181,10 +210,11 @@ impl Component for DevicePage {
                             },
                             connect_apply[sender] => move |entry_row| {
                                 let dpi = entry_row.text().parse::<u16>().ok();
-                                sender.input(DevicePageMsg::SelectDpi(dpi));
+                                sender.input(DevicePageMsg::SetDpi(dpi));
                             },
                         },
-                    }
+                    },
+                    model.dpi_stages_list.widget(),
                 },
                 // Apply Section
                 gtk::Box {
