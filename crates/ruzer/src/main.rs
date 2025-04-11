@@ -1,16 +1,15 @@
 use adw::prelude::*;
-use device_list::{DeviceListing, DeviceListingOutput};
 use device_page::{DevicePage, DevicePageMsg};
-use driver::common::RAZER_USB_VENDOR_ID;
+use home_page::{HomePage, HomePageMsg, HomePageOutput};
 use nusb::DeviceInfo;
 use relm4::prelude::*;
 
-mod device_list;
 mod device_page;
+mod home_page;
 
 struct App {
+    home_page: relm4::Controller<HomePage>,
     device_page: relm4::Controller<DevicePage>,
-    device_list: FactoryVecDeque<DeviceListing>,
 }
 
 #[derive(Debug)]
@@ -22,15 +21,6 @@ enum AppPage {
 #[derive(Debug)]
 enum AppMsg {
     SwitchPage(AppPage),
-    UpdateDeviceList,
-}
-
-fn scan_devices() -> Vec<DeviceInfo> {
-    nusb::list_devices()
-        .into_iter()
-        .flatten()
-        .filter(|device_info| device_info.vendor_id() == RAZER_USB_VENDOR_ID)
-        .collect()
 }
 
 #[relm4::component]
@@ -46,24 +36,14 @@ impl Component for App {
         window: Self::Root,
         sender: ComponentSender<Self>,
     ) -> relm4::ComponentParts<Self> {
-        let device_list = FactoryVecDeque::builder()
-            .launch(
-                gtk::ListBox::builder()
-                    .selection_mode(gtk::SelectionMode::None)
-                    .css_classes(["boxed-list"])
-                    .valign(gtk::Align::Start)
-                    .build(),
-            )
-            .forward(
+        let model = App {
+            home_page: HomePage::builder().launch(()).forward(
                 sender.input_sender(),
-                |DeviceListingOutput::SelectDevice(device_info)| {
+                |HomePageOutput::SelectDevice(device_info)| {
                     AppMsg::SwitchPage(AppPage::Device(device_info))
                 },
-            );
-
-        let model = App {
+            ),
             device_page: DevicePage::builder().launch(()).detach(),
-            device_list,
         };
         sender.input(AppMsg::SwitchPage(AppPage::Home));
 
@@ -75,29 +55,20 @@ impl Component for App {
         &mut self,
         widgets: &mut Self::Widgets,
         message: Self::Input,
-        sender: ComponentSender<Self>,
+        _sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
         match message {
             AppMsg::SwitchPage(AppPage::Device(device_info)) => {
                 self.device_page
                     .sender()
-                    .send(DevicePageMsg::SelectDevice(device_info))
+                    .send(DevicePageMsg::PageUpdate(device_info))
                     .unwrap();
                 widgets.root_stack.set_visible_child_name("device");
             }
             AppMsg::SwitchPage(AppPage::Home) => {
-                sender.input(AppMsg::UpdateDeviceList);
+                self.home_page.emit(HomePageMsg::UpdateDeviceList);
                 widgets.root_stack.set_visible_child_name("home");
-            }
-            AppMsg::UpdateDeviceList => {
-                println!("Updating device list...");
-                let mut device_list = self.device_list.guard();
-                let devices_info = scan_devices();
-                for device in devices_info {
-                    println!("added device");
-                    device_list.push_back(device);
-                }
             }
         }
     }
@@ -116,26 +87,15 @@ impl Component for App {
                 #[name = "root_stack"]
                 set_content = &gtk::Stack {
                     set_transition_type: gtk::StackTransitionType::Crossfade,
-                    add_named[Some("home")] = &adw::Clamp {
-                        gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            gtk::Label {
-                                set_label: "Select a Device",
-                                set_valign: gtk::Align::Start,
-                                set_css_classes: &["title-1"]
-                            },
-                            model.device_list.widget(),
-                        }
-                    },
+                    add_named[Some("home")] = model.home_page.widget(),
                     add_named[Some("device")] = model.device_page.widget(),
                 },
             },
-
         }
     }
 }
 
 fn main() {
-    let app = RelmApp::new("relm4.test.simple_manual");
+    let app = RelmApp::new("com.github.ruzer");
     app.run::<App>(());
 }

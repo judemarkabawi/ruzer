@@ -1,17 +1,14 @@
-use std::{
-    cmp::{max, min},
-    time::Duration,
-};
-
+use crate::chroma::{BreathingEffect, ExtendedMatrixEffect, LedId};
+use anyhow::{anyhow, Error, Result};
 use nusb::{
     transfer::{ControlIn, ControlOut, ControlType, Recipient},
     Interface,
 };
-
-use anyhow::{anyhow, Error, Result};
+use std::{
+    cmp::{max, min},
+    time::Duration,
+};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-
-use crate::chroma::{BreathingEffect, ExtendedMatrixEffect, LedId};
 
 pub const RAZER_USB_VENDOR_ID: u16 = 0x1532;
 pub(crate) const RAZER_REPORT_SIZE: usize = size_of::<RazerMessage>();
@@ -480,6 +477,7 @@ pub(crate) fn clamp<T: Ord>(val: T, min_range: T, max_range: T) -> T {
 pub(crate) fn decode_u16_from_bytes(val: &[u8]) -> u16 {
     ((val[0] as u16) << 8) | ((val[1] as u16) & 0xFF)
 }
+
 /// Big endian
 pub(crate) fn encode_u16_as_bytes(val: u16) -> [u8; 2] {
     [((val >> 8) & 0xFF) as u8, (val & 0xFF) as u8]

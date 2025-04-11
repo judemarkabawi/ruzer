@@ -1,3 +1,4 @@
+pub mod batched;
 pub mod chroma;
 pub mod common;
 pub mod devices;
